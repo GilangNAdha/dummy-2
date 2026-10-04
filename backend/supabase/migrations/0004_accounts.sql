@@ -2,7 +2,8 @@
 -- Migrasi tabel accounts (dompet: rekening bank, tunai, e-wallet)
 -- Penulis: Gilang Nur Adha
 -- Dipasang setelah households dan household_members (0002, 0003)
--- Catatan: hanya nama dompet, TIDAK menyimpan nomor rekening atau kredensial bank.
+-- Tidak menyimpan nomor rekening, nomor kartu, atau PIN.
+-- Saldo berjalan TIDAK disimpan, dihitung backend saat dibaca (current_balance).
 -- ============================================================
 
 -- 1. Enum jenis dompet
@@ -15,21 +16,24 @@ end $$;
 -- 2. Tabel accounts
 create table if not exists public.accounts (
     id              uuid primary key default gen_random_uuid(),
-    household_id    uuid not null references public.households(id) on delete cascade,
-    name            varchar(60) not null,
-    type            account_type not null default 'cash',
-    icon            varchar(8),
-    opening_balance bigint not null default 0 check (opening_balance >= 0),
-    is_archived     boolean not null default false,
+    household_id    uuid not null references public.households(id) on delete restrict,
+    name            varchar(80) not null,
+    type            account_type not null,
+    provider        varchar(60),
+    opening_balance bigint not null default 0,
+    is_active       boolean not null default true,
     created_at      timestamptz not null default now(),
     updated_at      timestamptz not null default now()
 );
 
--- nama dompet unik di dalam satu rumah tangga
+-- nama dompet unik per rumah tangga (aturan integritas 34)
 create unique index if not exists uq_accounts_household_name
     on public.accounts (household_id, name);
 
--- 3. Pemicu updated_at (dipakai juga oleh tabel categories)
+create index if not exists idx_accounts_household
+    on public.accounts (household_id);
+
+-- 3. Fungsi trigger updated_at bersama (create or replace agar aman bentrok)
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
@@ -45,26 +49,31 @@ create trigger trg_accounts_updated_at
     before update on public.accounts
     for each row execute function public.set_updated_at();
 
--- 4. RLS: semua anggota boleh membaca, hanya Ayah dan Ibu boleh menulis
+-- 4. RLS: anggota boleh baca, hanya ayah dan ibu boleh tulis
 alter table public.accounts enable row level security;
 
-drop policy if exists dompet_baca on public.accounts;
-create policy dompet_baca on public.accounts
+drop policy if exists dompet_baca_anggota on public.accounts;
+create policy dompet_baca_anggota on public.accounts
     for select
-    using (private.is_household_member(household_id));
+    using (
+        household_id in (
+            select household_id from public.household_members
+            where user_id = auth.uid()
+        )
+    );
 
-drop policy if exists dompet_tambah on public.accounts;
-create policy dompet_tambah on public.accounts
-    for insert
-    with check (private.household_role(household_id) in ('ayah', 'ibu'));
-
-drop policy if exists dompet_ubah on public.accounts;
-create policy dompet_ubah on public.accounts
-    for update
-    using (private.household_role(household_id) in ('ayah', 'ibu'))
-    with check (private.household_role(household_id) in ('ayah', 'ibu'));
-
-drop policy if exists dompet_hapus on public.accounts;
-create policy dompet_hapus on public.accounts
-    for delete
-    using (private.household_role(household_id) in ('ayah', 'ibu'));
+drop policy if exists dompet_tulis_ayah_ibu on public.accounts;
+create policy dompet_tulis_ayah_ibu on public.accounts
+    for all
+    using (
+        household_id in (
+            select household_id from public.household_members
+            where user_id = auth.uid() and role in ('ayah', 'ibu')
+        )
+    )
+    with check (
+        household_id in (
+            select household_id from public.household_members
+            where user_id = auth.uid() and role in ('ayah', 'ibu')
+        )
+    );
