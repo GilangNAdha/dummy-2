@@ -1,0 +1,59 @@
+# Uji akses lintas rumah tangga dan RLS (panduan kerja langkah 7.2)
+#
+# Uji ini MENEMBAK PostgREST LANGSUNG dengan kunci anon, melewati FastAPI.
+# Tujuannya membuktikan RLS tetap menolak walau lapisan FastAPI ditembus.
+#
+# Jalankan pada basis data nyata (Supabase lokal atau proyek pengujian).
+# Siapkan dua rumah tangga (A dan B) dan satu akun anak di rumah tangga A.
+#
+# Variabel:
+#   supabaseUrl alamat proyek, misalnya http://127.0.0.1:54321
+#   anon        kunci anon
+#   tokenA      token ayah rumah tangga A
+#   tokenAnakA  token anak rumah tangga A
+#   tokenB      token ayah rumah tangga B
+#   rumahA      id rumah tangga A
+
+@supabaseUrl = http://127.0.0.1:54321
+@anon = GANTI_DENGAN_KUNCI_ANON
+@tokenA = GANTI_DENGAN_TOKEN_AYAH_A
+@tokenAnakA = GANTI_DENGAN_TOKEN_ANAK_A
+@tokenB = GANTI_DENGAN_TOKEN_AYAH_B
+@rumahA = GANTI_DENGAN_UUID_RUMAH_TANGGA_A
+
+### 1. Pengguna rumah tangga B membaca dompet rumah tangga A -> harus daftar kosong []
+GET {{supabaseUrl}}/rest/v1/accounts?household_id=eq.{{rumahA}}
+apikey: {{anon}}
+Authorization: Bearer {{tokenB}}
+
+### 2. Kunci anon tanpa token pengguna membaca dompet -> harus daftar kosong []
+GET {{supabaseUrl}}/rest/v1/accounts?select=id,name
+apikey: {{anon}}
+
+### 3. Akun anak menambah dompet di rumah tangganya -> harus galat (kode Postgres 42501)
+POST {{supabaseUrl}}/rest/v1/accounts
+apikey: {{anon}}
+Authorization: Bearer {{tokenAnakA}}
+Content-Type: application/json
+
+{
+  "household_id": "{{rumahA}}",
+  "name": "Dompet Anak",
+  "type": "cash"
+}
+
+### 4. Ayah rumah tangga B mencoba mengubah kategori sistem -> tidak ada baris yang berubah
+PATCH {{supabaseUrl}}/rest/v1/categories?is_system=eq.true
+apikey: {{anon}}
+Authorization: Bearer {{tokenB}}
+Content-Type: application/json
+Prefer: return=representation
+
+{
+  "name": "diretas"
+}
+
+### 5. Akun anak membaca dompet rumah tangganya sendiri -> boleh (semua anggota boleh membaca)
+GET {{supabaseUrl}}/rest/v1/accounts?household_id=eq.{{rumahA}}
+apikey: {{anon}}
+Authorization: Bearer {{tokenAnakA}}

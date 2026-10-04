@@ -1,0 +1,173 @@
+# Koleksi permintaan uji: dompet (/accounts) dan kategori (/categories)
+# Potongan Gilang Nur Adha — 10 endpoint.
+#
+# Cara pakai: buka berkas ini dengan ekstensi REST Client (VS Code) atau
+# impor sebagai koleksi .http, lalu isi variabel di bawah. Setiap permintaan
+# dipisah oleh baris ###.
+#
+# Variabel yang harus diisi:
+#   token      access token Supabase pengguna uji (ayah, ibu, atau anak)
+#   tokenAnak  access token pengguna berperan anak (untuk uji 403)
+#   tokenB     access token pengguna rumah tangga lain (untuk uji lintas rumah tangga)
+#   rumahA     id rumah tangga pengguna uji
+#   dompetId   id dompet hasil permintaan 3
+#   kategoriId id kategori hasil permintaan 8
+
+@baseUrl = http://localhost:8000/api/v1
+@token = GANTI_DENGAN_ACCESS_TOKEN_AYAH
+@tokenAnak = GANTI_DENGAN_ACCESS_TOKEN_ANAK
+@tokenB = GANTI_DENGAN_ACCESS_TOKEN_RUMAH_TANGGA_LAIN
+@rumahA = GANTI_DENGAN_UUID_RUMAH_TANGGA_A
+@dompetId = GANTI_DENGAN_UUID_DOMPET
+@kategoriId = GANTI_DENGAN_UUID_KATEGORI
+
+### 1. GET daftar dompet (200, data + meta + links, penyaring di links)
+GET {{baseUrl}}/accounts?household_id={{rumahA}}&type=bank&is_active=true&page=1&per_page=20
+Authorization: Bearer {{token}}
+
+### 2. GET daftar dompet tanpa household_id (400 VALIDATION_ERROR)
+GET {{baseUrl}}/accounts
+Authorization: Bearer {{token}}
+
+### 3. POST tambah dompet (201). Ulangi sekali lagi untuk melihat 409 nama ganda
+POST {{baseUrl}}/accounts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "household_id": "{{rumahA}}",
+  "name": "DANA",
+  "type": "ewallet",
+  "provider": "DANA",
+  "opening_balance": 100000
+}
+
+### 4. PATCH ubah dompet (200). Ganti nama menjadi sama dengan dompet lain untuk 409
+PATCH {{baseUrl}}/accounts/{{dompetId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "DANA Syariah",
+  "is_active": true
+}
+
+### 5. DELETE dompet (200). Bila dompet dipakai transaksi: 409 "Dompet masih dipakai transaksi."
+DELETE {{baseUrl}}/accounts/{{dompetId}}
+Authorization: Bearer {{token}}
+
+### 6. GET daftar kategori (200, memuat delapan kategori sistem)
+GET {{baseUrl}}/categories?household_id={{rumahA}}&kind=expense&page=1&per_page=20
+Authorization: Bearer {{token}}
+
+### 7. POST tambah kategori (201). Warna "merah" akan ditolak 400
+POST {{baseUrl}}/categories
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "household_id": "{{rumahA}}",
+  "name": "Jajan Anak",
+  "kind": "expense",
+  "icon": "🍬",
+  "color": "#F59E0B"
+}
+
+### 8. GET detail kategori (200). Ganti id dengan id kategori sistem untuk kategori bawaan
+GET {{baseUrl}}/categories/{{kategoriId}}
+Authorization: Bearer {{token}}
+
+### 9. PATCH ubah kategori (200). Kategori sistem menjawab 403
+PATCH {{baseUrl}}/categories/{{kategoriId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "is_archived": true
+}
+
+### 10. DELETE kategori (200). Kategori sistem menjawab 403
+DELETE {{baseUrl}}/categories/{{kategoriId}}
+Authorization: Bearer {{token}}
+
+### 11. POST dompet tanpa token (401 UNAUTHENTICATED + X-Request-Id)
+POST {{baseUrl}}/accounts
+Content-Type: application/json
+
+{
+  "household_id": "{{rumahA}}",
+  "name": "Tanpa Token",
+  "type": "cash"
+}
+
+### 12. POST dompet dengan token anak (403 FORBIDDEN, lapisan FastAPI; RLS juga menolak)
+POST {{baseUrl}}/accounts
+Authorization: Bearer {{tokenAnak}}
+Content-Type: application/json
+
+{
+  "household_id": "{{rumahA}}",
+  "name": "Dompet Anak",
+  "type": "cash"
+}
+
+### 13. PATCH dompet dengan token anak (403 FORBIDDEN)
+PATCH {{baseUrl}}/accounts/{{dompetId}}
+Authorization: Bearer {{tokenAnak}}
+Content-Type: application/json
+
+{
+  "name": "Diubah Anak"
+}
+
+### 14. DELETE dompet dengan token anak (403 FORBIDDEN)
+DELETE {{baseUrl}}/accounts/{{dompetId}}
+Authorization: Bearer {{tokenAnak}}
+
+### 15. GET dompet rumah tangga A memakai token rumah tangga lain (200 dengan data kosong)
+GET {{baseUrl}}/accounts?household_id={{rumahA}}
+Authorization: Bearer {{tokenB}}
+
+### 16. POST dompet dengan saldo desimal (400 VALIDATION_ERROR, StrictInt)
+POST {{baseUrl}}/accounts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "household_id": "{{rumahA}}",
+  "name": "Saldo Desimal",
+  "type": "bank",
+  "opening_balance": 1000.5
+}
+
+### 17. PATCH dompet dengan badan kosong (400 VALIDATION_ERROR)
+PATCH {{baseUrl}}/accounts/{{dompetId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{}
+
+### 18. PATCH dompet mencoba memindahkan rumah tangga (400, extra="forbid")
+PATCH {{baseUrl}}/accounts/{{dompetId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "household_id": "00000000-0000-4000-8000-000000000000"
+}
+
+### 19. POST kategori dengan is_system dari klien (400, server yang memaksa false)
+POST {{baseUrl}}/categories
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "household_id": "{{rumahA}}",
+  "name": "Sistem Palsu",
+  "kind": "expense",
+  "is_system": true
+}
+
+### 20. GET daftar kategori dengan sort tidak dikenal (400)
+GET {{baseUrl}}/categories?household_id={{rumahA}}&sort=is_system:asc
+Authorization: Bearer {{token}}
