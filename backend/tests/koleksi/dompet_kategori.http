@@ -1,0 +1,76 @@
+# Koleksi permintaan uji /accounts dan /categories (REST Client VS Code / IntelliJ HTTP Client)
+# Penulis: Gilang Nur Adha
+# Isi token tiga peran dari Supabase Auth sebelum dipakai.
+@base = http://localhost:8000/api/v1
+@rt = <household_id>
+@tokenAyah = <access_token_ayah>
+@tokenAnak = <access_token_anak>
+
+### 401 tanpa token
+GET {{base}}/accounts?household_id={{rt}}
+
+### Daftar dompet beserta current_balance
+GET {{base}}/accounts?household_id={{rt}}&is_active=true&sort=name:asc
+Authorization: Bearer {{tokenAyah}}
+
+### Detail dompet
+GET {{base}}/accounts/<account_id>
+Authorization: Bearer {{tokenAyah}}
+
+### Tambah dompet (201)
+POST {{base}}/accounts
+Authorization: Bearer {{tokenAyah}}
+Content-Type: application/json
+
+{ "household_id": "{{rt}}", "name": "GoPay", "type": "ewallet", "provider": "GoPay", "opening_balance": 320000 }
+
+### Tambah dompet oleh anak (403)
+POST {{base}}/accounts
+Authorization: Bearer {{tokenAnak}}
+Content-Type: application/json
+
+{ "household_id": "{{rt}}", "name": "OVO", "type": "ewallet" }
+
+### Arsipkan dompet
+PATCH {{base}}/accounts/<account_id>
+Authorization: Bearer {{tokenAyah}}
+Content-Type: application/json
+
+{ "is_active": false }
+
+### Hapus dompet (200, atau 409 bila masih dipakai transaksi)
+DELETE {{base}}/accounts/<account_id>
+Authorization: Bearer {{tokenAyah}}
+
+### Daftar kategori (sistem + keluarga)
+GET {{base}}/categories?household_id={{rt}}&kind=expense
+Authorization: Bearer {{tokenAnak}}
+
+### Detail kategori
+GET {{base}}/categories/<category_id>
+Authorization: Bearer {{tokenAyah}}
+
+### Tambah kategori (201)
+POST {{base}}/categories
+Authorization: Bearer {{tokenAyah}}
+Content-Type: application/json
+
+{ "household_id": "{{rt}}", "name": "Arisan", "kind": "expense", "icon": "🎁", "color": "#F59E0B" }
+
+### Ubah kategori
+PATCH {{base}}/categories/<category_id>
+Authorization: Bearer {{tokenAyah}}
+Content-Type: application/json
+
+{ "is_archived": true }
+
+### Ubah kategori sistem (403)
+PATCH {{base}}/categories/<id_kategori_sistem>
+Authorization: Bearer {{tokenAyah}}
+Content-Type: application/json
+
+{ "name": "Ganti" }
+
+### Hapus kategori
+DELETE {{base}}/categories/<category_id>
+Authorization: Bearer {{tokenAyah}}
