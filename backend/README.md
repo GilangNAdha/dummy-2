@@ -51,3 +51,7 @@ tests                   pengujian
 ```
 pytest -q
 ```
+
+## Dompet dan Kategori
+
+Endpoint `/api/v1/accounts` dan `/api/v1/categories` beserta migrasi `0004` dan `0005`. Rincian: [`docs/DOMPET_DAN_KATEGORI.md`](../docs/DOMPET_DAN_KATEGORI.md).
