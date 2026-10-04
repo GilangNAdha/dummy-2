@@ -4,7 +4,7 @@ import json
 import pytest
 
 from app.core.errors import AppError
-from app.core.supabase_client import _cek, _jumlah_dari_range
+from app.core.supabase_client import KonflikData, _cek, _jumlah_dari_range
 
 
 class JawabanPalsu:
@@ -39,3 +39,35 @@ def test_jumlah_dibaca_dari_header_content_range():
     assert _jumlah_dari_range(JawabanPalsu(headers={"content-range": "0-19/137"})) == 137
     assert _jumlah_dari_range(JawabanPalsu(headers={"content-range": "*/0"})) == 0
     assert _jumlah_dari_range(JawabanPalsu()) == 0
+
+
+# --- pemetaan galat PostgREST menjadi 409 dan 403 (potongan dompet dan kategori)
+# Diuji di sini karena perilakunya milik core/supabase_client.py, bukan router.
+
+
+def test_kode_23505_menjadi_409_dengan_kode_postgres():
+    with pytest.raises(KonflikData) as galat:
+        _cek(JawabanPalsu(status_code=409, isi=b'{"code":"23505","message":"duplicate key value"}'))
+    assert galat.value.status_code == 409
+    assert galat.value.code == "CONFLICT"
+    assert galat.value.kode_postgres == "23505"
+
+
+def test_kode_23503_menjadi_409_dengan_kode_postgres():
+    with pytest.raises(KonflikData) as galat:
+        _cek(JawabanPalsu(status_code=409, isi=b'{"code":"23503","message":"violates foreign key constraint"}'))
+    assert galat.value.status_code == 409
+    assert galat.value.kode_postgres == "23503"
+
+
+def test_kode_42501_menjadi_403_walau_status_bukan_403():
+    with pytest.raises(AppError) as galat:
+        _cek(JawabanPalsu(status_code=400, isi=b'{"code":"42501","message":"new row violates row-level security policy"}'))
+    assert galat.value.status_code == 403
+    assert galat.value.code == "FORBIDDEN"
+
+
+def test_badan_galat_bukan_json_tetap_502():
+    with pytest.raises(AppError) as galat:
+        _cek(JawabanPalsu(status_code=500, isi=b"<html>galat</html>"))
+    assert galat.value.status_code == 502
