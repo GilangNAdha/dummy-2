@@ -192,13 +192,17 @@ export function transactionToApi(form, lookups) {
 
 // ------------------------------------------------------------ dompet accounts
 
+// Tabel accounts pada kontrak tidak menyimpan kolom icon (Bab 2.4.4), jadi
+// ikon diturunkan dari jenis dompet supaya tampilan tetap konsisten.
+export const IKON_DOMPET = { bank: '🏦', cash: '💵', ewallet: '📱' };
+
 export function accountFromApi(row) {
   return {
     id: row.id,
     name: row.name,
     provider: row.provider ?? '',
     type: row.type,
-    icon: row.icon ?? '',
+    icon: row.icon ?? IKON_DOMPET[row.type] ?? '',
     balance: row.current_balance ?? row.opening_balance ?? 0,
     openingBalance: row.opening_balance ?? 0,
     isActive: row.is_active ?? true,
