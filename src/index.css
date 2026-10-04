@@ -1,0 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+@import 'tailwindcss';
+
+@theme inline {
+  --color-primary: #0F172A;
+  --color-canvas: #FFFFFF;
+  --color-body: #334155;
+  --color-muted: #64748B;
+  --color-hairline: #E2E8F0;
+  --color-surface: #F8FAFC;
+  --color-surface-raised: #F1F5F9;
+  --color-accent-green: #10B981;
+  --color-accent-red: #EF4444;
+  --color-accent-amber: #F59E0B;
+  --color-accent-blue: #3B82F6;
+
+  --shadow-card: rgba(0, 0, 0, 0.08) 0px 4px 24px -4px;
+  --shadow-button: rgba(0, 0, 0, 0.05) 0px 1px 2px 0px;
+  --shadow-modal: rgba(0, 0, 0, 0.18) 0px 20px 48px -8px;
+
+  --radius-xs: 12px;
+  --radius-sm: 16px;
+  --radius-md: 20px;
+
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #F8FAFC;
+  color: #334155;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+input, select, textarea {
+  font-family: inherit;
+}
