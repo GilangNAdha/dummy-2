@@ -51,24 +51,36 @@ export default function Settings({ user }) {
     setTimeout(() => setSaved(false), 2000);
   };
 
+  // galat dari backend (400, 403, 409) ditampilkan lewat useToast
   const handleAddCategory = async (e) => {
     e.preventDefault();
     if (!catForm.name.trim()) return;
     setCatSaving(true);
     track('Settings:addCategory', { name: catForm.name });
-    await postCategory({ name: catForm.name.trim(), icon: catForm.icon, color: catForm.color, archived: false });
-    refetchCat();
-    showToast(`Kategori "${catForm.name.trim()}" berhasil ditambahkan`);
-    setCatSaving(false);
-    setShowCatForm(false);
-    setCatForm({ name: '', icon: '📦', color: '#94A3B8' });
+    try {
+      await postCategory({ name: catForm.name.trim(), icon: catForm.icon, color: catForm.color, archived: false });
+      refetchCat();
+      showToast(`Kategori "${catForm.name.trim()}" berhasil ditambahkan`);
+      setShowCatForm(false);
+      setCatForm({ name: '', icon: '📦', color: '#94A3B8' });
+    } catch (err) {
+      track('Settings:addCategoryGagal', { code: err.code, message: err.message });
+      showToast(err.message, 'error');
+    } finally {
+      setCatSaving(false);
+    }
   };
 
   const handleToggleArchive = async (cat) => {
     track('Settings:toggleArchive', { name: cat.name, archived: !cat.archived });
-    await putCategory(cat.name, { archived: !cat.archived });
-    refetchCat();
-    showToast(cat.archived ? `Kategori "${cat.name}" dipulihkan` : `Kategori "${cat.name}" diarsipkan`, 'info');
+    try {
+      await putCategory(cat.name, { archived: !cat.archived });
+      refetchCat();
+      showToast(cat.archived ? `Kategori "${cat.name}" dipulihkan` : `Kategori "${cat.name}" diarsipkan`, 'info');
+    } catch (err) {
+      track('Settings:toggleArchiveGagal', { code: err.code, message: err.message });
+      showToast(err.message, 'error');
+    }
   };
 
   const cats        = categories ?? [];
@@ -90,33 +102,46 @@ export default function Settings({ user }) {
     setShowAccForm(true);
   };
 
+  // galat dari backend (400, 403, 409) ditampilkan lewat useToast
   const handleSaveAcc = async (e) => {
     e.preventDefault();
     if (!accForm.name.trim()) return;
     setAccSaving(true);
     const balanceNum = parseInt(accForm.balance.replace(/\D/g, ''), 10) || 0;
-    if (editingAcc) {
-      track('Settings:editAccount', { id: editingAcc });
-      await putAccount(editingAcc, { name: accForm.name.trim(), icon: accForm.icon, type: accForm.type, balance: balanceNum });
-      showToast(`Rekening "${accForm.name.trim()}" diperbarui`);
-    } else {
-      track('Settings:addAccount', { name: accForm.name });
-      await postAccount({ id: String(Date.now()), name: accForm.name.trim(), icon: accForm.icon, type: accForm.type, balance: balanceNum });
-      showToast(`Rekening "${accForm.name.trim()}" berhasil ditambahkan`);
+    try {
+      if (editingAcc) {
+        track('Settings:editAccount', { id: editingAcc });
+        await putAccount(editingAcc, { name: accForm.name.trim(), icon: accForm.icon, type: accForm.type, balance: balanceNum });
+        showToast(`Rekening "${accForm.name.trim()}" diperbarui`);
+      } else {
+        track('Settings:addAccount', { name: accForm.name });
+        await postAccount({ id: String(Date.now()), name: accForm.name.trim(), icon: accForm.icon, type: accForm.type, balance: balanceNum });
+        showToast(`Rekening "${accForm.name.trim()}" berhasil ditambahkan`);
+      }
+      refetchAcc();
+      setShowAccForm(false);
+      setAccForm(emptyAccForm);
+      setEditingAcc(null);
+    } catch (err) {
+      track('Settings:simpanAccountGagal', { code: err.code, message: err.message });
+      showToast(err.message, 'error');
+    } finally {
+      setAccSaving(false);
     }
-    refetchAcc();
-    setAccSaving(false);
-    setShowAccForm(false);
-    setAccForm(emptyAccForm);
-    setEditingAcc(null);
   };
 
   const handleDeleteAcc = async (id) => {
     track('Settings:deleteAccount', { id });
-    await deleteAccount(id);
-    refetchAcc();
-    showToast('Rekening berhasil dihapus', 'info');
-    setConfirmDeleteAcc(null);
+    try {
+      await deleteAccount(id);
+      refetchAcc();
+      showToast('Rekening berhasil dihapus', 'info');
+      setConfirmDeleteAcc(null);
+    } catch (err) {
+      // 409 CONFLICT: dompet masih dipakai transaksi
+      track('Settings:deleteAccountGagal', { code: err.code, message: err.message });
+      showToast(err.message, 'error');
+    }
   };
 
   // props user dipakai pada baris pertama, nilai bawaan dipakai bila props kosong
