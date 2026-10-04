@@ -4,7 +4,7 @@ import uuid
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import profiles, reports
+from app.api.v1 import accounts, categories, profiles, reports
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
 
@@ -36,6 +36,8 @@ async def request_id(request: Request, call_next):
 register_error_handlers(app)
 
 app.include_router(profiles.router, prefix=settings.api_prefix)
+app.include_router(accounts.router, prefix=settings.api_prefix)
+app.include_router(categories.router, prefix=settings.api_prefix)
 app.include_router(reports.router, prefix=settings.api_prefix)
 
 
